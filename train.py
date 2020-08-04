@@ -3,37 +3,60 @@ import torch
 
 from config import opt
 from data.cifar import CIFAR10
-from model import CNN, JoCor_loss, loss_coteaching
+from model import CNN, JoCor_loss, loss_coteaching, JoCor_loss_backward_only
 
 torch.manual_seed(1)
 torch.cuda.manual_seed(1)
 
-def train(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule):
+def train(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule, opt):
     correct_1 = 0
     correct_2 = 0
     loss_t_total = 0
     total_instance = 0 
-    loss_instance = 0
-
+    loss_instance = len(train_loader)
     for i,(imgs, labels, index) in enumerate(train_loader):
         y1 = cnn1(imgs.cuda())
         y2 = cnn2(imgs.cuda())
         target = labels.long().cuda()
         # calculate the loss
-        loss_t, num_remember = JoCor_loss(y1, y2, target, rate_schedule[epoch], 0.85)
         
-        correct_1 += sum(y1.argmax(axis = 1) ==  target)
-        correct_2 += sum(y2.argmax(axis = 1) ==  target)
-        total_instance += imgs.shape[0]
-        
-        loss_instance += num_remember
-        loss_t_total += loss_t.item()
+        if opt.loss == 'co-teaching':
+            loss_1, loss_2= loss_coteaching(y1, y2, target, rate_schedule[epoch])
+            correct_1 += sum(y1.argmax(axis = 1) ==  target)
+            correct_2 += sum(y2.argmax(axis = 1) ==  target)
 
-        optimizer2.zero_grad()
-        optimizer1.zero_grad()
-        loss_t.backward()
-        optimizer1.step()
-        optimizer2.step()
+            total_instance += imgs.shape[0]
+
+            loss_1_total += loss_1.item()
+            loss_2_total += loss_2.item()
+
+            optimizer2.zero_grad()
+            optimizer1.zero_grad()
+
+            loss_1.backward()
+            loss_2.backward()
+
+            optimizer1.step()
+            optimizer2.step()
+
+        if opt.loss is in ['JoCoR', 'JoCoR_backward_only']:
+            if opt.loss == 'JoCoR':
+                loss_t= JoCor_loss(y1, y2, target, rate_schedule[epoch], 0.85)
+        
+            if opt.loss == 'JoCoR_backward_only':
+                loss_t= JoCor_loss_backward_only(y1, y2, target, rate_schedule[epoch], 0.85)
+
+            correct_1 += sum(y1.argmax(axis = 1) ==  target)
+            correct_2 += sum(y2.argmax(axis = 1) ==  target)
+            total_instance += imgs.shape[0]
+            
+            loss_t_total += loss_t.item()
+
+            optimizer2.zero_grad()
+            optimizer1.zero_grad()
+            loss_t.backward()
+            optimizer1.step()
+            optimizer2.step()
     
     return loss_t_total / loss_instance , correct_1.long().item() / total_instance , correct_2.long().item() / total_instance
 
