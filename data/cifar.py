@@ -28,7 +28,8 @@ class CIFAR10(Dataset):
         self.transform = transform
         self.train_data = np.zeros((0,3,32,32))
         self.train_labels = np.zeros((0,))
-        self.noise_rate = noise_rate    
+        self.noise_rate = noise_rate  
+
         if self.train:
             for fentry in self.train_list:
                 f = fentry[0]

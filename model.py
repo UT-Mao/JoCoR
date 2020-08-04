@@ -91,6 +91,32 @@ def JoCor_loss(y_1, y_2, t, forget_rate, alpha):
     y_2 = torch.softmax(y_2, dim = 1)
     
     loss_3 = KLloss(y_1.log(), y_2).sum(1) + KLloss(y_2.log(), y_1).sum(1)
+    loss_t = (1 - alpha) * (loss_1 + loss_2) + alpha * loss_3
+    
+    ind_t_sorted = np.argsort(loss_t.data.cpu()).cuda()
+    loss_t_sorted = loss_t[ind_t_sorted]
+    
+    remember_rate = 1 - forget_rate
+    num_remember = int(remember_rate * len(loss_t_sorted))
+    ind_t_update=ind_t_sorted[:num_remember]
+    
+    loss_t_update = loss_t[ind_t_update]
+    
+    return torch.mean(loss_t_update), num_remember
+
+def JoCor_loss_backward_only(y_1, y_2, t, forget_rate, alpha):
+    loss_1 = F.cross_entropy(y_1, t, reduction='none')
+    loss_2 = F.cross_entropy(y_2, t, reduction='none')
+    KLloss = nn.KLDivLoss(reduction ='none')
+    
+    y_1 = torch.softmax(y_1, dim = 1)
+    y_2 = torch.softmax(y_2, dim = 1)
+    
+    loss_3 = KLloss(y_1.log(), y_2).sum(1) + KLloss(y_2.log(), y_1).sum(1)
+    
+    # here is different from the original paper
+    # Select clean sample without the KL_loss
+
     loss_t = (1 - alpha) * (loss_1 + loss_2)# + alpha * loss_3
     
     ind_t_sorted = np.argsort(loss_t.data.cpu()).cuda()
@@ -105,7 +131,6 @@ def JoCor_loss(y_1, y_2, t, forget_rate, alpha):
     loss_t_update = loss_t[ind_t_update]
     
     return torch.mean(loss_t_update), num_remember
-
 
 
 
