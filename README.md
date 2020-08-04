@@ -18,9 +18,9 @@ cd JoCoR
 python train.py
 ```
 
-you can adjust the noise rate of the training data and some other parameters by modifying the config.py
+You can adjust the noise rate of the training data and some other parameters by modifying the config.py
 
-for example, if you want to try original co-teaching, you can just set `loss = 'co-teaching'`  in config.py
+For example, if you want to try original co-teaching, you can just set `loss = 'co-teaching'`  in config.py
 
 Now this implementation support co-teaching and JoCoR loss.
 
