@@ -9,7 +9,7 @@ torch.manual_seed(1)
 torch.cuda.manual_seed(1)
 
 
-def train_JoCoR(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule):
+def train_JoCoR(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule, opt):
     correct_1 = 0
     correct_2 = 0
     
@@ -23,7 +23,7 @@ def train_JoCoR(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_sch
         y2 = cnn2(imgs.cuda())
 
         target = labels.long().cuda()
-        loss_t = JoCor_loss(y1, y2, target, rate_schedule[epoch], 0.85)
+        loss_t = JoCor_loss(y1, y2, target, rate_schedule[epoch], opt.lamda)
 
         correct_1 += sum(y1.argmax(axis = 1) ==  target)
         correct_2 += sum(y2.argmax(axis = 1) ==  target)
@@ -57,7 +57,7 @@ def train_co_teaching(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, ra
         y2 = cnn2(imgs.cuda())
 
         target = labels.long().cuda()
-        loss_1, loss_2 = loss_coteaching(y1, y2, target, rate_schedule[epoch], 0.85)
+        loss_1, loss_2 = loss_coteaching(y1, y2, target, rate_schedule[epoch])
 
         correct_1 += sum(y1.argmax(axis = 1) ==  target)
         correct_2 += sum(y2.argmax(axis = 1) ==  target)
@@ -77,8 +77,6 @@ def train_co_teaching(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, ra
     
     return loss_1_total / loss_instance, loss_2_total / loss_instance, correct_1.long().item() / total_instance , correct_2.long().item() / total_instance
 
-
-
 def test(test_loader, cnn1, cnn2):
     correct_1 = 0
     correct_2 = 0
@@ -93,6 +91,11 @@ def test(test_loader, cnn1, cnn2):
         correct_2 += sum(y2.argmax(axis = 1) ==  target)
         
     return correct_1.long().item()/ total, correct_2.long().item()/ total
+
+def print_configuration(opt):
+    print('loss:',opt.loss)
+    if opt.loss in ['JoCoR',  'JoCoR_backward_only']:
+        print('lambda:', opt.lamda)
 
 def set_schedule(opt):
     alpha_plan = [opt.learning_rate] * opt.n_epoch
@@ -109,6 +112,7 @@ def adjust_learning_rate(optimizer, epoch, alpha_plan, beta_plan):
         param_group['lr']=alpha_plan[epoch]
         param_group['betas']=(beta_plan[epoch], 0.999)
 
+print_configuration(opt)
 
 data = CIFAR10(noise_rate = opt.noise_rate)
 train_loader = torch.utils.data.DataLoader(dataset=data,batch_size=128,drop_last=True,shuffle=True)
@@ -135,9 +139,9 @@ for epoch in range(opt.n_epoch):
     adjust_learning_rate(optimizer2, epoch, alpha_plan, beta_plan)
     
     if opt.loss in ['JoCoR', 'JoCoR_backward_only']:
-        loss_t_total, correct_1, correct_2 = train_JoCoR(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule)
+        loss_t_total, correct_1, correct_2 = train_JoCoR(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule, opt)
     else:
-        loss_1_total, loss_2_total, correct_1, correct_2 = train_co_teaching(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule,)
+        loss_1_total, loss_2_total, correct_1, correct_2 = train_co_teaching(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule)
 
     cnn1.eval()
     cnn2.eval()
@@ -146,7 +150,7 @@ for epoch in range(opt.n_epoch):
     if opt.loss in ['JoCoR', 'JoCoR_backward_only']:
         print('epoch',epoch,'|loss:' '%.4f' % loss_t_total ,'|acc1:''%.3f' % correct_1 , '|acc2:''%.3f' % correct_2, '|acc1_t:''%.3f' % acc1_test , '|acc2_t:''%.3f' % acc2_test)
     else:
-        print('epoch',epoch,'|loss1:' '%.4f' % loss_1_total ,'|loss1:' '%.4f' % loss_2_total, '|acc1:''%.3f' % correct_1 , '|acc2:''%.3f' % correct_2, '|acc1_t:''%.3f' % acc1_test , '|acc2_t:''%.3f' % acc2_test)
+        print('epoch',epoch,'|loss1:' '%.4f' % loss_1_total ,'|loss2:' '%.4f' % loss_2_total, '|acc1:''%.3f' % correct_1 , '|acc2:''%.3f' % correct_2, '|acc1_t:''%.3f' % acc1_test , '|acc2_t:''%.3f' % acc2_test)
 if opt.save:
     torch.save(cnn1.state_dict(), opt.save_path_1)
     torch.save(cnn2.state_dict(), opt.save_path_2)

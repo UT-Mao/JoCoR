@@ -2,6 +2,9 @@ class Config:
     #dataset
     noise_rate = 0.2
 
+    #lambda for JoCoR
+    lamda = 0.85
+
     # param for schedule
     n_epoch = 200
     epoch_decay_start = 80
@@ -26,7 +29,7 @@ class Config:
     save_path_2 = './cnn2.pth'
 
     # please select from JoCoR, co-teaching and JoCoR_backward_only 
-    loss = 'JoCoR'
+    loss = 'JoCoR_backward_only'
 
 
 
