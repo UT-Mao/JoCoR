@@ -80,7 +80,7 @@ def loss_coteaching(y_1, y_2, t, forget_rate):
     loss_1_update = F.cross_entropy(y_1[ind_2_update], t[ind_2_update])
     loss_2_update = F.cross_entropy(y_2[ind_1_update], t[ind_1_update])
 
-    return torch.sum(loss_1_update)/num_remember, torch.sum(loss_2_update)/num_remember, num_remember
+    return torch.sum(loss_1_update)/num_remember, torch.sum(loss_2_update)/num_remember
 
 def JoCor_loss(y_1, y_2, t, forget_rate, alpha):
     loss_1 = F.cross_entropy(y_1, t, reduction='none')
@@ -102,7 +102,7 @@ def JoCor_loss(y_1, y_2, t, forget_rate, alpha):
     
     loss_t_update = loss_t[ind_t_update]
     
-    return torch.mean(loss_t_update), num_remember
+    return torch.mean(loss_t_update)
 
 def JoCor_loss_backward_only(y_1, y_2, t, forget_rate, alpha):
     loss_1 = F.cross_entropy(y_1, t, reduction='none')
@@ -130,7 +130,7 @@ def JoCor_loss_backward_only(y_1, y_2, t, forget_rate, alpha):
     
     loss_t_update = loss_t[ind_t_update]
     
-    return torch.mean(loss_t_update), num_remember
+    return torch.mean(loss_t_update)
 
 
 

@@ -8,57 +8,76 @@ from model import CNN, JoCor_loss, loss_coteaching, JoCor_loss_backward_only
 torch.manual_seed(1)
 torch.cuda.manual_seed(1)
 
-def train(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule, opt):
+
+def train_JoCoR(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule):
     correct_1 = 0
     correct_2 = 0
+    
     loss_t_total = 0
     total_instance = 0 
+    
     loss_instance = len(train_loader)
+
     for i,(imgs, labels, index) in enumerate(train_loader):
         y1 = cnn1(imgs.cuda())
         y2 = cnn2(imgs.cuda())
+
         target = labels.long().cuda()
-        # calculate the loss
+        loss_t = JoCor_loss(y1, y2, target, rate_schedule[epoch], 0.85)
+
+        correct_1 += sum(y1.argmax(axis = 1) ==  target)
+        correct_2 += sum(y2.argmax(axis = 1) ==  target)
+        total_instance += imgs.shape[0]
+
+        loss_t_total += loss_t.item()
+
+        optimizer2.zero_grad()
+        optimizer1.zero_grad()
         
-        if opt.loss == 'co-teaching':
-            loss_1, loss_2= loss_coteaching(y1, y2, target, rate_schedule[epoch])
-            correct_1 += sum(y1.argmax(axis = 1) ==  target)
-            correct_2 += sum(y2.argmax(axis = 1) ==  target)
-
-            total_instance += imgs.shape[0]
-
-            loss_1_total += loss_1.item()
-            loss_2_total += loss_2.item()
-
-            optimizer2.zero_grad()
-            optimizer1.zero_grad()
-
-            loss_1.backward()
-            loss_2.backward()
-
-            optimizer1.step()
-            optimizer2.step()
-
-        if opt.loss in ['JoCoR', 'JoCoR_backward_only']:
-            if opt.loss == 'JoCoR':
-                loss_t= JoCor_loss(y1, y2, target, rate_schedule[epoch], 0.85)
+        loss_t.backward()
         
-            if opt.loss == 'JoCoR_backward_only':
-                loss_t= JoCor_loss_backward_only(y1, y2, target, rate_schedule[epoch], 0.85)
-
-            correct_1 += sum(y1.argmax(axis = 1) ==  target)
-            correct_2 += sum(y2.argmax(axis = 1) ==  target)
-            total_instance += imgs.shape[0]
-            
-            loss_t_total += loss_t.item()
-
-            optimizer2.zero_grad()
-            optimizer1.zero_grad()
-            loss_t.backward()
-            optimizer1.step()
-            optimizer2.step()
+        optimizer1.step()
+        optimizer2.step()
     
     return loss_t_total / loss_instance , correct_1.long().item() / total_instance , correct_2.long().item() / total_instance
+
+
+def train_co_teaching(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule):
+    correct_1 = 0
+    correct_2 = 0
+    
+    loss_1_total = 0
+    loss_2_total = 0
+    total_instance = 0 
+
+    loss_instance = len(train_loader)
+
+    for i,(imgs, labels, index) in enumerate(train_loader):
+        y1 = cnn1(imgs.cuda())
+        y2 = cnn2(imgs.cuda())
+
+        target = labels.long().cuda()
+        loss_1, loss_2 = loss_coteaching(y1, y2, target, rate_schedule[epoch], 0.85)
+
+        correct_1 += sum(y1.argmax(axis = 1) ==  target)
+        correct_2 += sum(y2.argmax(axis = 1) ==  target)
+        total_instance += imgs.shape[0]
+
+        loss_1_total += loss_1.item()
+        loss_2_total += loss_2.item() 
+
+        optimizer2.zero_grad()
+        optimizer1.zero_grad()
+        
+        loss_1.backward()
+        loss_2.backward()
+
+        optimizer1.step()
+        optimizer2.step()
+    
+    return loss_1_total / loss_instance, loss_2_total / loss_instance, correct_1.long().item() / total_instance , correct_2.long().item() / total_instance
+
+
 
 def test(test_loader, cnn1, cnn2):
     correct_1 = 0
@@ -115,13 +134,19 @@ for epoch in range(opt.n_epoch):
     cnn2.train()
     adjust_learning_rate(optimizer2, epoch, alpha_plan, beta_plan)
     
-    loss_1_total, correct_1, correct_2 = train(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule)
-    
+    if opt.loss in ['JoCoR', 'JoCoR_backward_only']:
+        loss_t_total, correct_1, correct_2 = train_JoCoR(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule)
+    else:
+        loss_1_total, loss_2_total, correct_1, correct_2 = train_co_teaching(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule,)
+
     cnn1.eval()
     cnn2.eval()
     acc1_test, acc2_test = test(test_loader, cnn1, cnn2)
-    print('epoch',epoch,'|loss:' '%.4f' % loss_1_total ,'|acc1:''%.3f' % correct_1 , '| acc2:''%.3f' % correct_2, '|acc1_t:''%.3f' % acc1_test , '| acc2_t:''%.3f' % acc2_test)
 
+    if opt.loss in ['JoCoR', 'JoCoR_backward_only']:
+        print('epoch',epoch,'|loss:' '%.4f' % loss_t_total ,'|acc1:''%.3f' % correct_1 , '|acc2:''%.3f' % correct_2, '|acc1_t:''%.3f' % acc1_test , '|acc2_t:''%.3f' % acc2_test)
+    else:
+        print('epoch',epoch,'|loss1:' '%.4f' % loss_1_total ,'|loss1:' '%.4f' % loss_2_total, '|acc1:''%.3f' % correct_1 , '|acc2:''%.3f' % correct_2, '|acc1_t:''%.3f' % acc1_test , '|acc2_t:''%.3f' % acc2_test)
 if opt.save:
     torch.save(cnn1.state_dict(), opt.save_path_1)
     torch.save(cnn2.state_dict(), opt.save_path_2)
