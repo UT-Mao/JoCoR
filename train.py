@@ -39,7 +39,7 @@ def train(train_loader,epoch, cnn1, cnn2, optimizer1, optimizer2, rate_schedule,
             optimizer1.step()
             optimizer2.step()
 
-        if opt.loss is in ['JoCoR', 'JoCoR_backward_only']:
+        if opt.loss in ['JoCoR', 'JoCoR_backward_only']:
             if opt.loss == 'JoCoR':
                 loss_t= JoCor_loss(y1, y2, target, rate_schedule[epoch], 0.85)
         
