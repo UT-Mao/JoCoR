@@ -22,8 +22,8 @@ class Config:
     cnn2_path = None
 
     save = True
-    save_path_1 = None
-    save_path_2 = None
+    save_path_1 = './cnn1.pth'
+    save_path_2 = './cnn2.pth'
 
 
 
