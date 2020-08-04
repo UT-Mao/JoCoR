@@ -25,6 +25,9 @@ class Config:
     save_path_1 = './cnn1.pth'
     save_path_2 = './cnn2.pth'
 
+    # please select from JoCoR, co-teaching and JoCoR_backward_only 
+    loss = 'JoCoR'
+
 
 
 opt = Config()
